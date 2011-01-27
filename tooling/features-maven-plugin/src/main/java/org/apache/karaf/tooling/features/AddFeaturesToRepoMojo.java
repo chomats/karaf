@@ -40,6 +40,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.resolver.ArtifactNotFoundException;
 import org.apache.maven.artifact.resolver.ArtifactResolutionException;
+import org.apache.maven.model.Dependency;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.w3c.dom.Document;
@@ -178,6 +179,28 @@ public class AddFeaturesToRepoMojo extends MojoSupport {
                             classifier = parts[4];
                         }
                     }
+                } else {
+                	for(Object d : project.getDependencies()) {
+                		Dependency dep = (Dependency)  d;
+                		if (artifactId.equals(dep.getArtifactId()) && groupId.equals(dep.getGroupId())) {
+                			version = dep.getVersion();
+                			classifier = dep.getClassifier();
+                			if (version != null) break;
+                		}
+                	}
+                	if (version == null && project.getDependencyManagement() != null) {
+                		for(Object d : project.getDependencyManagement().getDependencies()) {
+                    		Dependency dep = (Dependency)  d;
+                    		if (artifactId.equals(dep.getArtifactId()) && groupId.equals(dep.getGroupId())) {
+                    			version = dep.getVersion();
+                    			classifier = dep.getClassifier();
+                    			if (version != null) break;
+                    		}
+                    	}
+                	}
+                }
+                if (version == null || version.isEmpty()) {
+                	throw new MojoExecutionException("Cannot found version for: " + bundle);
                 }
                 String dir = groupId.replace('.', '/') + "/" + artifactId + "/" + version + "/";
                 String name = artifactId + "-" + version + (classifier != null ? "-" + classifier : "") + "." + type;
