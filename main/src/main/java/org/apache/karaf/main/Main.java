@@ -591,6 +591,10 @@ public class Main {
             	maxsl = addToAutoTreeMap(PROPERTY_AUTO_INSTALL, sl, autoInstall, maxsl, key);
             }
         }
+        if (defaultStartLevel < maxsl)
+        	defaultStartLevel = maxsl;
+        sl.setStartLevel(defaultStartLevel);
+        
         // We process property from level 1 to level maxsl
         // For each level, we process before auto-install and after auto-start.
         // if a property exists for this level.
@@ -612,7 +616,7 @@ public class Main {
 			for (Bundle b : bundlesLevel) {
 				try {
 					b.start();
-					System.out.println("START: "+b.getSymbolicName()+", "+b.getLocation());
+					System.out.println("START: "+b.getSymbolicName()+", "+b.getLocation()+((b.getState() == Bundle.ACTIVE)?" : ACTIVE":""));
 				} catch (Exception ex) {
 					System.err.println("Error starting bundle "
 							+ b.getSymbolicName() + ": " + ex+" at start level "+startLevel);
@@ -621,8 +625,7 @@ public class Main {
             // Start level service is running in another thread and all bundles activators
 			// run in another thread.
 			// We must wait all bundles are activated before start and install the next level.
-			// If one or more can start before the timeout
-			sl.setStartLevel(startLevel);
+			// If one or more can start before the timeout ?
 			long startTime = System.currentTimeMillis();
 			long timeOut = Long.parseLong(configProps.getProperty(KARAF_TIMEOUT_AUTO_START, "100000"));
 			if (timeOut <= 0) {
