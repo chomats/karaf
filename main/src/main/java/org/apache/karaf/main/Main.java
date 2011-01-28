@@ -535,9 +535,8 @@ public class Main {
      * specified configuration properties.
      *
      * @param context the system bundle context
-     * @throws Exception (time out or Interrupted) 
      */
-    private int processAutoProperties(BundleContext context) throws Exception {
+    private int processAutoProperties(BundleContext context) {
         // Check if we want to convert URLs to maven style
         boolean convertToMavenUrls = Boolean.parseBoolean(configProps.getProperty(PROPERTY_CONVERT_TO_MAVEN_URL, "true"));
 
@@ -1301,9 +1300,7 @@ public class Main {
                     Thread.sleep(lockDelay);
                 } 
             } else {
-            	int sl = processAutoProperties(framework.getBundleContext());
-                if (sl < defaultStartLevel)
-                 	setStartLevel(defaultStartLevel);
+            	processAutoProperties(framework.getBundleContext());
             }
         } catch (Exception e) {
             e.printStackTrace();
