@@ -40,7 +40,6 @@ import java.security.AccessControlException;
 import java.security.Provider;
 import java.security.Security;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -51,7 +50,6 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.StringTokenizer;
 import java.util.TreeMap;
-import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -182,10 +180,6 @@ public class Main {
 
     public static final String KARAF_SHUTDOWN_PID_FILE = "karaf.shutdown.pid.file";
     
-    public static final String KARAF_TIMEOUT_AUTO_START = "karaf.timeout.autostart";
-    
-    public static final String KARAF_TIMEOUT_STEP = "karaf.timeout.step";
-
     public static final String DEFAULT_SHUTDOWN_COMMAND = "SHUTDOWN";
 
     public static final String PROPERTY_LOCK_CLASS_DEFAULT = SimpleFileLock.class.getName();
@@ -591,6 +585,7 @@ public class Main {
             	maxsl = addToAutoTreeMap(PROPERTY_AUTO_INSTALL, sl, autoInstall, maxsl, key);
             }
         }
+        // the start level must be fixed upper maxsl to start all bunldes in the same thread
         if (defaultStartLevel < maxsl)
         	defaultStartLevel = maxsl;
         sl.setStartLevel(defaultStartLevel);
@@ -598,6 +593,8 @@ public class Main {
         // We process property from level 1 to level maxsl
         // For each level, we process before auto-install and after auto-start.
         // if a property exists for this level.
+        // A bundle which must be started haven't to have some package depencies 
+        // on a bundle which must be installed at a upper level.
         for (int startLevel= 1 ; startLevel <= maxsl ; startLevel++) {
         	String installValue = autoInstall.get(startLevel);
         	if (installValue != null) {
@@ -615,50 +612,16 @@ public class Main {
         	// Now loop through and start the installed bundles.
 			for (Bundle b : bundlesLevel) {
 				try {
+                    //the bundle must start synchronously (in the same thread).
 					b.start();
-					System.out.println("START: "+b.getSymbolicName()+", "+b.getLocation()+((b.getState() == Bundle.ACTIVE)?" : ACTIVE":""));
+					System.out.println("START: "+b.getSymbolicName()+", "+b.getLocation()+((b.getState() == Bundle.ACTIVE)?" : ACTIVE":"")+", "+startLevel);
 				} catch (Exception ex) {
 					System.err.println("Error starting bundle "
 							+ b.getSymbolicName() + ": " + ex+" at start level "+startLevel);
 				}
 			}
-            // Start level service is running in another thread and all bundles activators
-			// run in another thread.
-			// We must wait all bundles are activated before start and install the next level.
-			// If one or more can start before the timeout ?
-			long startTime = System.currentTimeMillis();
-			long timeOut = Long.parseLong(configProps.getProperty(KARAF_TIMEOUT_AUTO_START, "100000"));
-			if (timeOut <= 0) {
-				timeOut = Integer.MAX_VALUE;
-			}
-			long timeOutStep = Long.parseLong(configProps.getProperty(KARAF_TIMEOUT_STEP, "1000"));
-
-			while(true) {
-				boolean allstart = true;
-				
-				for (Bundle b : bundlesLevel) {
-					if (b.getState() == Bundle.ACTIVE) continue;
-					allstart = false;
-				}
-				if (allstart) break;
-				if ((System.currentTimeMillis() - startTime) > timeOut)
-					throw new TimeoutException("Time out : cannot start bundles "+toNotStartBundle(bundlesLevel));
-				Thread.sleep(timeOutStep);
-			}
-            System.out.println("SET SL TO : "+startLevel);
         }
         return maxsl;
-    }
-
-	private String toNotStartBundle(List<Bundle> bundlesLevel) {
-		StringBuilder sb = new StringBuilder();
-		for (Bundle b : bundlesLevel) {
-			if (b.getState() == Bundle.ACTIVE) continue;
-			sb.append(b.getLocation()).append(", ");
-		}
-		if (sb.length()>3)
-			sb.setLength(sb.length()-2);
-		return sb.toString();
     }
 
 	private int addToAutoTreeMap(String propertyPrefix, StartLevel sl, Map<Integer, String> autoMap,
