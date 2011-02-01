@@ -62,6 +62,13 @@ import org.xml.sax.SAXException;
 public class AddFeaturesToRepoMojo extends MojoSupport {
 
     /**
+     * The artifact type of a feature
+     * 
+     * @parameter default-value="xml"
+     */
+    private String featureArtifactType = "xml";
+    
+    /**
      * @parameter
      */
     private List<String> descriptors;
@@ -101,6 +108,17 @@ public class AddFeaturesToRepoMojo extends MojoSupport {
      */
     private boolean addTransitiveFeatures = true;
 
+    private Dependency findDependency(List<Dependency> dependencies, String artifactId, String groupId) {
+    	for(Dependency dep : dependencies) {
+    		if (artifactId.equals(dep.getArtifactId()) && groupId.equals(dep.getGroupId()) &&
+    				featureArtifactType.equals(dep.getType())) {
+    			if (dep.getVersion() != null) 
+    				return dep;
+    		}
+    	}
+    	return null;
+    }
+    
     public void execute() throws MojoExecutionException, MojoFailureException {
         try {
             Map<String, Feature> featuresMap = new HashMap<String, Feature>();
@@ -180,23 +198,13 @@ public class AddFeaturesToRepoMojo extends MojoSupport {
                         }
                     }
                 } else {
-                	for(Object d : project.getDependencies()) {
-                		Dependency dep = (Dependency)  d;
-                		if (artifactId.equals(dep.getArtifactId()) && groupId.equals(dep.getGroupId())) {
-                			version = dep.getVersion();
-                			classifier = dep.getClassifier();
-                			if (version != null) break;
-                		}
+                	Dependency dep = findDependency(project.getDependencies(), artifactId, groupId);
+                	if (dep == null && project.getDependencyManagement() != null) {
+                		dep = findDependency(project.getDependencyManagement().getDependencies(), artifactId, groupId);
                 	}
-                	if (version == null && project.getDependencyManagement() != null) {
-                		for(Object d : project.getDependencyManagement().getDependencies()) {
-                    		Dependency dep = (Dependency)  d;
-                    		if (artifactId.equals(dep.getArtifactId()) && groupId.equals(dep.getGroupId())) {
-                    			version = dep.getVersion();
-                    			classifier = dep.getClassifier();
-                    			if (version != null) break;
-                    		}
-                    	}
+                	if (dep != null) {
+                		version = dep.getVersion();
+            			classifier = dep.getClassifier();
                 	}
                 }
                 if (version == null || version.isEmpty()) {
