@@ -31,7 +31,7 @@
     <packaging>bundle</packaging>
     <name>Apache Karaf :: Deployer :: Wrap Non OSGi Jar</name>
 
-    <description>This deployer transforms non OSGi jar files to a deployable bundle</description>
+    <description>This deployer transforms non OSGi jar files to a deployable bundle.</description>
 
     <properties>
         <appendedResourcesDirectory>${basedir}/../../etc/appended-resources</appendedResourcesDirectory>
@@ -39,25 +39,42 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.apache.karaf</groupId>
+            <artifactId>org.apache.karaf.util</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.osgi</groupId>
             <artifactId>org.osgi.core</artifactId>
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.apache.felix</groupId>
             <artifactId>org.apache.felix.fileinstall</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.servicemix.bundles</groupId>
             <artifactId>org.apache.servicemix.bundles.junit</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>${project.basedir}/src/main/resources</directory>
+                <includes>
+                    <include>**/*</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>${project.basedir}/src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>**/*.info</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.felix</groupId>
@@ -67,7 +84,10 @@
                         <Bundle-SymbolicName>${project.artifactId}</Bundle-SymbolicName>
                         <Export-Package>${project.artifactId}*;version=${project.version}</Export-Package>
                         <Import-Package>!${project.artifactId}*,*</Import-Package>
-                        <Private-Package>org.apache.karaf.deployer.wrap</Private-Package>
+                        <Private-Package>
+                            org.apache.karaf.deployer.wrap,
+                            org.apache.karaf.util
+                        </Private-Package>
                         <_versionpolicy>${bnd.version.policy}</_versionpolicy>
                     </instructions>
                 </configuration>

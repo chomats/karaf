@@ -66,7 +66,7 @@ public class StringsCompleter
         this(Arrays.asList(strings));
     }
 
-    public Collection<String> getStrings() {
+    public SortedSet<String> getStrings() {
         return strings;
     }
 
@@ -81,7 +81,8 @@ public class StringsCompleter
             buffer = buffer.toLowerCase();
         }
 
-        SortedSet<String> matches = strings.tailSet(buffer);
+        // KARAF-421, use getStrings() instead strings field.
+        SortedSet<String> matches = getStrings().tailSet(buffer);
 
         for (String match : matches) {
             String s = caseSensitive ? match : match.toLowerCase();

@@ -31,8 +31,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.ops4j.pax.url.maven.commons.MavenConfiguration;
 import org.ops4j.pax.url.maven.commons.MavenConfigurationImpl;
 import org.ops4j.pax.url.maven.commons.MavenRepositoryURL;
@@ -46,13 +44,15 @@ import org.osgi.framework.BundleException;
 import org.osgi.framework.BundleListener;
 import org.osgi.service.cm.Configuration;
 import org.osgi.service.cm.ConfigurationAdmin;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A Runnable singleton which watches at the defined location for bundle updates.
  */
 public class BundleWatcher implements Runnable, BundleListener {
 
-    private static Log logger = LogFactory.getLog(BundleWatcher.class);
+    private final Logger logger = LoggerFactory.getLogger(BundleWatcher.class);
 
     private BundleContext bundleContext;
     private ConfigurationAdmin configurationAdmin;
@@ -82,7 +82,7 @@ public class BundleWatcher implements Runnable, BundleListener {
         }
         int oldCounter = -1;
         Set<Bundle> watchedBundles = new HashSet<Bundle>();
-        while (running.get() && !watchURLs.isEmpty()) {
+        while (running.get() && watchURLs.size()>0) {
             if (oldCounter != counter.get()) {
                 oldCounter = counter.get();
                 watchedBundles.clear();
@@ -92,7 +92,7 @@ public class BundleWatcher implements Runnable, BundleListener {
                     }
                 }
             }
-            if (!watchedBundles.isEmpty()) {
+            if (watchedBundles.size()>0) {
                 File localRepository = getLocalRepository();
                 for (Bundle bundle : watchedBundles) {
                     try {
@@ -133,7 +133,7 @@ public class BundleWatcher implements Runnable, BundleListener {
      * @param url
      */
     public void add(String url) {
-        boolean shouldStart = running.get() && watchURLs.isEmpty();
+        boolean shouldStart = running.get() && (watchURLs.size()==0);
         if (!watchURLs.contains(url)) {
             watchURLs.add(url);
             counter.incrementAndGet();
@@ -253,7 +253,7 @@ public class BundleWatcher implements Runnable, BundleListener {
 
     public void start() {
         if (running.compareAndSet(false, true)) {
-            if (!watchURLs.isEmpty()) {
+            if (watchURLs.size()>0) {
                 Thread thread = new Thread(this);
                 thread.start();
             }

@@ -397,6 +397,7 @@
             <optional>true</optional>
         </dependency>
     </dependencies>
+
     <build>
         <resources>
             <resource>
@@ -405,6 +406,13 @@
                 <includes>
                     <include>**/*</include>
                 </includes>
+            </resource>
+            <resource>
+                <directory>${project.basedir}/src/main/resources/extra</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>**/*</exclude>
+                </excludes>
             </resource>
         </resources>
         <plugins>
@@ -489,7 +497,7 @@
                         <configuration>
                             <artifacts>
                                 <artifact>
-                                  <file>src/main/configfiles/jetty.xml</file>
+                                  <file>src/main/resources/extra/jetty.xml</file>
                                   <type>xml</type>
                                   <classifier>jettyconfig</classifier>
                                 </artifact>
