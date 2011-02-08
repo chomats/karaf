@@ -441,8 +441,8 @@ public abstract class MojoSupport extends AbstractMojo {
                 type = dep.getType();
             }
         }
-        if (version == null || version.isEmpty()) {
-            throw new MojoExecutionException("Cannot found version for: " + bundle);
+        if (version == null || version.length() == 0) {
+            throw new MojoExecutionException("Cannot find version for: " + bundle);
         }
         Artifact artifact = factory.createArtifactWithClassifier(groupId, artifactId, version, type, classifier);
         artifact.setRepository(repo);
