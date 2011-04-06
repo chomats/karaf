@@ -267,7 +267,7 @@ public class Main {
             processAutoProperties(framework.getBundleContext());
         }
         framework.start();
-        // Start lock monitor
+    	// Start lock monitor
         new Thread() {
             public void run() {
                 lock(configProps);
