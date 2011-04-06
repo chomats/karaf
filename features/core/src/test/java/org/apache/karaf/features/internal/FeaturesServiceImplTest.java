@@ -22,17 +22,25 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.Dictionary;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 
 import junit.framework.TestCase;
 
 import org.apache.felix.utils.manifest.Clause;
+import org.apache.karaf.features.BundleInfo;
 import org.apache.karaf.features.Feature;
+import org.apache.karaf.features.internal.FeaturesServiceImpl.InstallationState;
 import org.easymock.EasyMock;
+import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.BundleException;
+import org.osgi.framework.Constants;
 import org.osgi.framework.FrameworkListener;
+import org.osgi.framework.Version;
 
 /**
  * Test cases for {@link FeaturesServiceImpl}
@@ -175,4 +183,33 @@ public class FeaturesServiceImplTest extends TestCase {
         assertNotNull(result);
         assertEquals("No optional imports expected", 0, result.size());
     }
+    
+    // check not install twice a bundle with the symbolic name has attribute like
+    //org.apache.karaf.deployer.spring;blueprint.graceperiod:=false
+    public void testNotInstallSameSNWithAttribute() throws IOException, BundleException {
+        FeaturesServiceImpl service = new FeaturesServiceImpl();
+        BundleContext bundleContext = EasyMock.createMock(BundleContext.class);
+        Bundle goodBundle = EasyMock.createMock(Bundle.class);
+        BundleInfo bundleInfo = EasyMock.createMock(BundleInfo.class);
+        String location = getClass().getClassLoader().getResource("testNotInstallSameSNWithAttribute.jar").toString();
+		InstallationState state = new InstallationState();
+
+		expect(bundleInfo.getLocation()).andReturn(location).atLeastOnce();
+		replay(bundleInfo);
+        expect(bundleContext.getBundles()).andReturn(new Bundle[] { goodBundle });
+        replay(bundleContext);
+        expect(goodBundle.getSymbolicName()).andReturn("org.apache.karaf.deployer.spring").atLeastOnce();
+        expect(goodBundle.getHeaders()).andReturn(map(Constants.BUNDLE_VERSION,"2.1.0")).atLeastOnce();
+        replay(goodBundle);
+        
+        service.setBundleContext(bundleContext);
+		service.installBundleIfNeeded(state, bundleInfo, false);
+    }
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	private Dictionary map(String cst, String value) {
+		Dictionary ret = new Hashtable();
+		ret.put(cst, value);
+		return ret;
+	}
 }

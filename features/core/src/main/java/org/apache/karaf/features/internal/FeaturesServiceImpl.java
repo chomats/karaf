@@ -652,6 +652,12 @@ public class FeaturesServiceImpl implements FeaturesService, FrameworkListener {
                 throw new BundleException("Manifest not present in the first entry of the zip " + bundleLocation);
             }
             String sn = m.getMainAttributes().getValue(Constants.BUNDLE_SYMBOLICNAME);
+            //Remove attribute for sn which has its like org.apache.karaf.deployer.spring;blueprint.graceperiod:=false
+            int index_sep = sn.indexOf(';');
+            if (index_sep != -1) {
+            	sn = sn.substring(0, index_sep);
+            }
+            
             String vStr = m.getMainAttributes().getValue(Constants.BUNDLE_VERSION);
             Version v = vStr == null ? Version.emptyVersion : Version.parseVersion(vStr);
             for (Bundle b : bundleContext.getBundles()) {
