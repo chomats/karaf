@@ -31,6 +31,7 @@ import java.security.AccessControlException;
 import java.security.Provider;
 import java.security.Security;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
@@ -535,7 +536,7 @@ public class Main {
      *
      * @param context the system bundle context
      */
-    private void processAutoProperties(BundleContext context) {
+    private int processAutoProperties(BundleContext context) {
         // Check if we want to convert URLs to maven style
         boolean convertToMavenUrls = Boolean.parseBoolean(configProps.getProperty(PROPERTY_CONVERT_TO_MAVEN_URL, "true"));
 
@@ -560,7 +561,6 @@ public class Main {
         // the start level to which the bundles are assigned is specified by
         // appending a ".n" to the auto-install property name, where "n" is
         // the desired start level for the list of bundles.
-        autoInstall(PROPERTY_AUTO_INSTALL, context, sl, convertToMavenUrls, false);
 
         // The auto-start property specifies a space-delimited list of
         // bundle URLs to be automatically installed and started into each
@@ -569,67 +569,113 @@ public class Main {
         // where "n" is the desired start level for the list of bundles.
         // The following code starts bundles in one pass, installing bundles
         // for a given level, then starting them, then moving to the next level.
-        autoInstall(PROPERTY_AUTO_START, context, sl, convertToMavenUrls, true);
-    }
 
-    private List<Bundle> autoInstall(String propertyPrefix, BundleContext context, StartLevel sl, boolean convertToMavenUrls, boolean start) {
         Map<Integer, String> autoStart = new TreeMap<Integer, String>();
+        Map<Integer, String> autoInstall = new TreeMap<Integer, String>();
+        int maxsl = 1;
         List<Bundle> bundles = new ArrayList<Bundle>();
+        // We sort auto-start property and auto-install property with level information.
         for (Object o : configProps.keySet()) {
             String key = (String) o;
-            // Ignore all keys that are not the auto-start property.
-            if (!key.startsWith(propertyPrefix)) {
-                continue;
-            }
-            // If the auto-start property does not have a start level,
-            // then assume it is the default bundle start level, otherwise
-            // parse the specified start level.
-            int startLevel = sl.getInitialBundleStartLevel();
-            if (!key.equals(propertyPrefix)) {
-                try {
-                    startLevel = Integer.parseInt(key.substring(key.lastIndexOf('.') + 1));
-                } catch (NumberFormatException ex) {
-                    System.err.println("Invalid property: " + key);
-                }
-            }
-            autoStart.put(startLevel, configProps.getProperty(key));
-        }
-        for (Integer startLevel : autoStart.keySet()) {
-            StringTokenizer st = new StringTokenizer(autoStart.get(startLevel), "\" ", true);
-            if (st.countTokens() > 0) {
-                String location;
-                do {
-                    location = nextLocation(st);
-                    if (location != null) {
-                        try {
-                            String[] parts = convertToMavenUrlsIfNeeded(location, convertToMavenUrls);
-                            Bundle b = context.installBundle(parts[0], new URL(parts[1]).openStream());
-                            sl.setBundleStartLevel(b, startLevel);
-                            bundles.add(b);
-                        }
-                        catch (Exception ex) {
-                            System.err.println("Error installing bundle  " + location + ": " + ex);
-                        }
-                    }
-                }
-                while (location != null);
+            // Ignore all keys that are not the auto-start property or auto-install property.
+            if (key.startsWith(PROPERTY_AUTO_START)) {
+            	maxsl = addToAutoTreeMap(PROPERTY_AUTO_START, sl, autoStart, maxsl, key);
+            } else if (key.startsWith(PROPERTY_AUTO_INSTALL)) {
+            	maxsl = addToAutoTreeMap(PROPERTY_AUTO_INSTALL, sl, autoInstall, maxsl, key);
             }
         }
-        // Now loop through and start the installed bundles.
-        if (start) {
-            for (Bundle b : bundles) {
+        // the start level must be fixed upper maxsl to start all bunldes in the same thread
+        if (defaultStartLevel < maxsl)
+        	defaultStartLevel = maxsl;
+        sl.setStartLevel(defaultStartLevel);
+        
+        // We process property from level 1 to level maxsl
+        // For each level, we process before auto-install and after auto-start.
+        // if a property exists for this level.
+        // A bundle which must be started haven't to have some package depencies 
+        // on a bundle which must be installed at a upper level.
+        for (int startLevel= 1 ; startLevel <= maxsl ; startLevel++) {
+        	String installValue = autoInstall.get(startLevel);
+        	if (installValue != null) {
+        		installBundles(context, sl,
+						convertToMavenUrls, bundles, startLevel, installValue);
+        	}
+        	
+        	String startValue = autoStart.get(startLevel);
+        	if (startValue == null) continue; // no auto-start property for this level
+        	
+        	List<Bundle> bundlesLevel = installBundles(context, sl,
+						convertToMavenUrls, bundles, startLevel, startValue);
+            
+               
+        	// Now loop through and start the installed bundles.
+			for (Bundle b : bundlesLevel) {
+				try {
+                    //the bundle must start synchronously (in the same thread).
+					b.start();
+					System.out.println("START: "+b.getSymbolicName()+", "+b.getLocation()+((b.getState() == Bundle.ACTIVE)?" : ACTIVE":"")+", "+startLevel);
+				} catch (Exception ex) {
+					System.err.println("Error starting bundle "
+							+ b.getSymbolicName() + ": " + ex+" at start level "+startLevel);
+				}
+			}
+        }
+        return maxsl;
+    }
+
+	private int addToAutoTreeMap(String propertyPrefix, StartLevel sl, Map<Integer, String> autoMap,
+		int maxsl, String key) {
+        // If the auto-start property does not have a start level,
+        // then assume it is the default bundle start level, otherwise
+        // parse the specified start level.
+        int startLevel = sl.getInitialBundleStartLevel();
+        if (!key.equals(propertyPrefix)) {
+            try {
+                startLevel = Integer.parseInt(key.substring(key.lastIndexOf('.') + 1));
+            }
+            catch (NumberFormatException ex) {
+                System.err.println("Invalid property: " + key);
+            }
+        }
+		if (maxsl < startLevel)
+			maxsl = startLevel;
+		autoMap.put(startLevel, configProps.getProperty(key));
+		return maxsl;
+    }
+
+	private List<Bundle> installBundles(BundleContext context, StartLevel sl,
+			boolean convertToMavenUrls, List<Bundle> bundles, int startLevel,
+			String startValue) {
+		StringTokenizer st = new StringTokenizer(startValue, "\" ", true);
+        if (st.countTokens() <= 0) 
+        	return Collections.emptyList();
+        	
+		List<Bundle> bundlesCanBeStarted = new ArrayList<Bundle>();
+        String location;
+        do {
+            location = nextLocation(st);
+            if (location != null) {
                 try {
-                    String fragmentHostHeader = (String) b.getHeaders().get(Constants.FRAGMENT_HOST);
-                    if (fragmentHostHeader == null || fragmentHostHeader.trim().length() == 0) {
-                        b.start();
-                    }
+                    String[] parts = convertToMavenUrlsIfNeeded(location, convertToMavenUrls);
+                    Bundle b = context.installBundle(parts[0], new URL(parts[1]).openStream());
+                    System.out.println("INSTALL: "+b.getSymbolicName()+", "+b.getLocation());
+                    sl.setBundleStartLevel(b, startLevel);
+                    bundles.add(b);
+		            String fragmentHostHeader = (String) b.getHeaders()
+					.get(Constants.FRAGMENT_HOST);
+		            if (fragmentHostHeader == null
+					|| fragmentHostHeader.trim().length() == 0) {
+		            	bundlesCanBeStarted.add(b);
+		            }
                 }
                 catch (Exception ex) {
-                    System.err.println("Error starting bundle " + b.getSymbolicName() + ": " + ex);
+                	System.err.println("Error installing bundle  " + location + ": " + ex+" at start level "+startLevel);
                 }
             }
         }
-        return bundles;
+        while (location != null);
+		
+		return bundlesCanBeStarted;
     }
 
     private static String[] convertToMavenUrlsIfNeeded(String location, boolean convertToMavenUrls) {
@@ -1232,7 +1278,7 @@ public class Main {
             if (Boolean.parseBoolean(props.getProperty(PROPERTY_USE_LOCK, "true"))) {
                 doLock(props);
             } else {
-                setStartLevel(defaultStartLevel);
+            	processAutoProperties(framework.getBundleContext());
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -1244,13 +1290,20 @@ public class Main {
         lock = (Lock) Class.forName(clz).getConstructor(Properties.class).newInstance(props);
         boolean lockLogged = false;
         setStartLevel(lockStartLevel);
+        
+        // You process property auto-start and auto-install 
+        // after set start leve at lockStartLevel
+        // May put this instruction in the while block only the first time and after the lock. 
+        int sl = processAutoProperties(framework.getBundleContext());
+        
         while (!exiting) {
             if (lock.lock()) {
                 if (lockLogged) {
                     LOG.info("Lock acquired.");
                 }
                 setupShutdown(props);
-                setStartLevel(defaultStartLevel);
+                if (sl < defaultStartLevel)
+                	setStartLevel(defaultStartLevel);
                 for (;;) {
                     if (!lock.isAlive()) {
                         break;
@@ -1260,6 +1313,7 @@ public class Main {
                 if (framework.getState() == Bundle.ACTIVE && !exiting) {
                     LOG.info("Lost the lock, stopping this instance ...");
                     setStartLevel(lockStartLevel);
+                    sl = lockStartLevel;
                 }
             } else if (!lockLogged) {
                 LOG.info("Waiting for the lock ...");

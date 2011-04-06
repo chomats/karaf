@@ -114,8 +114,10 @@
                             !org.fusesource.jansi*,
                             !javax.swing,
                             !jline,
+                            !org.fusesource.hawtjni.runtime,
                             com.sun.jna*;resolution:=optional,
                             org.apache.karaf.branding;resolution:=optional,
+                            org.osgi.service.event;resolution:=optional,
                             *
                         </Import-Package>
                         <Export-Package>
