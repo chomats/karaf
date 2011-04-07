@@ -826,6 +826,7 @@ public class FeaturesServiceImpl implements FeaturesService, FrameworkListener {
         if (version != null) {
             version = version.trim();
         }
+        name = name.trim();
         Map<String, Feature> versions = getFeatures().get(name);
         if (versions == null || versions.isEmpty()) {
             return null;
