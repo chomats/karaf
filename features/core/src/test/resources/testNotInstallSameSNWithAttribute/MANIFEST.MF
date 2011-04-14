@@ -1,0 +1,8 @@
+Manifest-Version: 1.0
+Bundle-Name: org.apache.karaf.deployer.spring
+Bundle-Vendor: org.apache
+Bundle-Version: 2.1.0
+Bundle-ManifestVersion: 2
+Bundle-Description: org.apache.karaf.deployer.spring
+Bundle-SymbolicName: org.apache.karaf.deployer.spring;blueprint.graceperiod:=false
+
