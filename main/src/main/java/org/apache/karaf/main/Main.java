@@ -264,7 +264,7 @@ public class Main {
         // If we have a clean state, install everything
         if (framework.getBundleContext().getBundles().length == 1) {
             loadStartupProperties(configProps);
-            processAutoProperties(framework.getBundleContext());
+        //    processAutoProperties(framework.getBundleContext());
         }
         framework.start();
     	// Start lock monitor
